@@ -1,0 +1,80 @@
+# ══════════════════════════════════════════════════════════════
+# FocusForge v2 — config.yaml
+# ══════════════════════════════════════════════════════════════
+
+app:
+  host: "127.0.0.1"
+  port: 8765
+  debug: false
+
+# ── Camera ────────────────────────────────────────────────────
+camera:
+  device_id: 0          # change to 1 or 2 for external cameras
+  fps_face: 30
+  fps_pose: 10
+  fps_hands: 15
+  frame_width: 640
+  frame_height: 480
+  min_detection_confidence: 0.6
+  min_tracking_confidence: 0.6
+
+# ── Calibration ───────────────────────────────────────────────
+calibration:
+  duration_seconds: 30
+  required_frames: 200   # sit still for ~7s to complete
+
+# ── Detection thresholds ──────────────────────────────────────
+thresholds:
+  # Head pose (z-score units after baseline normalisation)
+  yaw_switch_threshold: 25.0
+  pitch_distraction_threshold: 20.0
+  # Gaze
+  gaze_drift_threshold: 0.3
+  gaze_instability_window: 2.0       # seconds
+  # Procrastination
+  risk_medium: 0.45
+  risk_high: 0.70
+  risk_critical: 0.85
+  # Blink
+  blink_rate_overload: 8.0           # blinks/min — low blink = high load
+  blink_rate_fatigue: 22.0           # blinks/min — high blink = fatigue
+  # Switch FSM
+  switch_dwell_seconds: 1.5          # must look away N sec to confirm switch
+  re_engagement_stability: 3.0       # sec of stable gaze = re-engaged
+
+# ── Intervention engine ───────────────────────────────────────
+intervention:
+  cooldown_seconds: 120              # min gap between alerts
+  min_risk_to_trigger: 0.65
+  delay_switch_ms: 1500
+
+# ── Database (v1) ─────────────────────────────────────────────
+database:
+  path: "data/cognitive_data.db"
+  retention_days: 90
+  # NEW v2: feature logging DB (separate file for ML training data)
+  feature_log_path: "data/feature_log.db"
+
+# ── ML Model Layer (v2) ───────────────────────────────────────
+model:
+  # Path to saved LSTM weights JSON
+  # Auto-created after first run via POST /api/model/save-weights
+  weights_path: "data/lstm_weights.json"
+
+  # LSTM architecture (change requires code update in temporal_model.py)
+  sequence_len: 30      # frames in one prediction window (~1 sec at 30fps)
+  hidden_size: 64       # LSTM hidden units
+
+  # Feature logging intervals
+  log_interval_sec: 2.0     # how often to write feature vectors to DB
+  db_snapshot_sec: 5.0      # how often to write cognitive snapshots to main DB
+
+# ── Personal signature ────────────────────────────────────────
+personal_signature:
+  rolling_window_days: 7
+  min_sessions_for_profile: 3
+
+# ── Multi-monitor (optional) ──────────────────────────────────
+multi_monitor:
+  enabled: false
+  secondary_yaw_zone: [-50, -20]   # degrees — normal left-look range

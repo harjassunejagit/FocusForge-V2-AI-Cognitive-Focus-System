@@ -1,0 +1,12 @@
+{
+  "editor.formatOnSave": true,
+  "python.defaultInterpreterPath": "python",
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/node_modules": true,
+    "**/dist": true
+  },
+  "editor.rulers": [100],
+  "terminal.integrated.defaultProfile.windows": "Command Prompt"
+}

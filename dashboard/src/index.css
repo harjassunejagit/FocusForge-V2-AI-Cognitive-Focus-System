@@ -1,0 +1,5 @@
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#070b14;color:#e2e8f0;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;min-height:100vh;font-size:14px}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:#0d1220}
+::-webkit-scrollbar-thumb{background:#1e3a5f;border-radius:4px}

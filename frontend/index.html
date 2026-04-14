@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cognitive Switch AI — Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:        #0d0f14;
+  --surface:   #161922;
+  --surface2:  #1e2330;
+  --border:    #2a3040;
+  --accent:    #4f8ef7;
+  --green:     #22c55e;
+  --yellow:    #f59e0b;
+  --red:       #ef4444;
+  --purple:    #a855f7;
+  --text:      #e2e8f0;
+  --muted:     #64748b;
+  --radius:    12px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  min-height: 100vh;
+}
+
+/* ── Layout ─────────────────────────────────────────────────── */
+.app {
+  display: grid;
+  grid-template-rows: 56px 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 24px;
+}
+header h1 { font-size: 16px; font-weight: 700; letter-spacing: .5px; }
+header h1 span { color: var(--accent); }
+
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: background .3s;
+}
+.status-dot.connected  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.status-dot.calibrating { background: var(--yellow); animation: pulse 1s infinite; }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+.header-right { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+.btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background .2s;
+}
+.btn:hover { background: var(--border); }
+.btn.accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.main {
+  display: grid;
+  grid-template-columns: 320px 1fr 320px;
+  gap: 0;
+  overflow: hidden;
+}
+
+/* ── Panels ─────────────────────────────────────────────────── */
+.panel {
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.panel:last-child { border-right: none; border-left: 1px solid var(--border); }
+
+.center-panel { padding: 16px; overflow-y: auto; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.card-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+/* ── Risk Gauge ──────────────────────────────────────────────── */
+.risk-gauge-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.risk-number {
+  font-size: 48px;
+  font-weight: 800;
+  line-height: 1;
+  transition: color .5s;
+}
+.risk-number.low      { color: var(--green); }
+.risk-number.medium   { color: var(--yellow); }
+.risk-number.high     { color: #f97316; }
+.risk-number.critical { color: var(--red); animation: pulse .5s infinite; }
+
+.risk-bar-outer {
+  width: 100%;
+  height: 8px;
+  background: var(--surface2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.risk-bar-inner {
+  height: 100%;
+  border-radius: 4px;
+  transition: width .4s ease, background .4s;
+}
+
+/* ── Metric Row ──────────────────────────────────────────────── */
+.metric-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.metric {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.metric-label {
+  width: 110px;
+  font-size: 12px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.metric-bar-outer {
+  flex: 1;
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.metric-bar-inner {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .3s ease;
+}
+.metric-value {
+  width: 36px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ── State Badge ─────────────────────────────────────────────── */
+.state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: all .3s;
+}
+.state-badge.focused    { background: #14532d30; border-color: var(--green);  color: var(--green); }
+.state-badge.confused   { background: #78350f30; border-color: var(--yellow); color: var(--yellow);}
+.state-badge.high_load  { background: #7f1d1d30; border-color: var(--red);    color: var(--red);   }
+.state-badge.fatigued   { background: #312e8130; border-color: var(--purple); color: var(--purple);}
+.state-badge.distracted { background: #1e3a5f30; border-color: var(--accent); color: var(--accent);}
+.state-badge.unknown    { background: var(--surface2); color: var(--muted); }
+
+/* ── Switch Phase ────────────────────────────────────────────── */
+.phase-pill {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.phase-focused    { background: #14532d40; color: var(--green); }
+.phase-pre_switch { background: #78350f40; color: var(--yellow); }
+.phase-disengaging{ background: #92400e40; color: #fb923c; }
+.phase-switched   { background: #7f1d1d40; color: var(--red); }
+.phase-returning  { background: #1e3a5f40; color: var(--accent); }
+.phase-recovering { background: #312e8140; color: var(--purple); }
+
+/* ── Alert Banner ────────────────────────────────────────────── */
+.alert-banner {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a2236;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 14px 20px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 8px 32px #0008;
+  z-index: 100;
+  transition: opacity .4s, transform .4s;
+  display: none;
+}
+.alert-banner.visible {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.alert-banner.warning { border-color: var(--red); }
+.alert-banner.delay   { border-color: var(--yellow); }
+.alert-banner.coaching{ border-color: var(--green); }
+
+/* ── Charts ──────────────────────────────────────────────────── */
+.chart-wrap { position: relative; height: 160px; }
+
+/* ── Timeline ────────────────────────────────────────────────── */
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.timeline-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--surface2);
+  font-size: 12px;
+}
+.timeline-time { color: var(--muted); flex-shrink: 0; font-size: 11px; min-width: 50px; }
+
+/* ── Recovery Plan ───────────────────────────────────────────── */
+.action-list { display: flex; flex-direction: column; gap: 6px; }
+.action-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--surface2);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.action-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ── Insights ────────────────────────────────────────────────── */
+.insight-item {
+  padding: 8px 10px;
+  background: var(--surface2);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  border-left: 3px solid var(--accent);
+}
+
+/* ── Calibration Overlay ─────────────────────────────────────── */
+#calibration-overlay {
+  position: fixed;
+  inset: 0;
+  background: #0d0f14ee;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  z-index: 200;
+}
+.cal-progress-outer {
+  width: 320px; height: 10px;
+  background: var(--surface2);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.cal-progress-inner {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--purple));
+  border-radius: 5px;
+  transition: width .4s;
+}
+#calibration-overlay h2 { font-size: 22px; }
+#calibration-overlay p  { color: var(--muted); text-align: center; max-width: 340px; line-height: 1.6; }
+
+/* ── Scrollbar ───────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Stats Grid ──────────────────────────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.stat-box {
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stat-val { font-size: 20px; font-weight: 800; color: var(--accent); }
+.stat-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+</style>
+</head>
+<body>
+
+<!-- Calibration Overlay -->
+<div id="calibration-overlay">
+  <h2>🧠 Cognitive AI Calibrating</h2>
+  <p>Sit naturally and look at your screen.<br>We're learning your personal baseline.</p>
+  <div class="cal-progress-outer">
+    <div class="cal-progress-inner" id="cal-bar" style="width:0%"></div>
+  </div>
+  <p id="cal-text" style="font-size:13px; color:var(--accent)">0%</p>
+</div>
+
+<!-- Alert Banner -->
+<div class="alert-banner" id="alert-banner">
+  <span id="alert-icon">💡</span>
+  <span id="alert-msg"></span>
+  <button class="btn" onclick="dismissAlert()" style="margin-left:auto; padding:4px 10px">✕</button>
+</div>
+
+<div class="app">
+  <!-- Header -->
+  <header>
+    <div class="status-dot" id="conn-dot"></div>
+    <h1>Cognitive <span>Switch AI</span></h1>
+    <span id="session-label" style="font-size:12px; color:var(--muted)"></span>
+    <div class="header-right">
+      <span id="frame-counter" style="font-size:11px; color:var(--muted)">0 fps</span>
+      <button class="btn" onclick="recalibrate()">↺ Recalibrate</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <!-- ── Left Panel: Cognitive State + Signals ── -->
+    <div class="panel">
+
+      <!-- Cognitive State -->
+      <div class="card">
+        <div class="card-title">Cognitive State</div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:10px">
+          <div class="state-badge unknown" id="state-badge">Connecting...</div>
+          <div style="font-size:12px; color:var(--muted); text-align:center" id="cog-label">—</div>
+        </div>
+        <br>
+        <div class="metric-row">
+          <div class="metric">
+            <span class="metric-label">🟢 Focus</span>
+            <div class="metric-bar-outer"><div class="metric-bar-inner" id="bar-focus" style="width:50%; background:var(--green)"></div></div>
+            <span class="metric-value" id="val-focus">50%</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">🔴 Load</span>
+            <div class="metric-bar-outer"><div class="metric-bar-inner" id="bar-load" style="width:30%; background:var(--red)"></div></div>
+            <span class="metric-value" id="val-load">30%</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">😴 Fatigue</span>
+            <div class="metric-bar-outer"><div class="metric-bar-inner" id="bar-fatigue" style="width:10%; background:var(--purple)"></div></div>
+            <span class="metric-value" id="val-fatigue">10%</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">🟡 Confusion</span>
+            <div class="metric-bar-outer"><div class="metric-bar-inner" id="bar-confusion" style="width:10%; background:var(--yellow)"></div></div>
+            <span class="metric-value" id="val-confusion">10%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Raw Signals -->
+      <div class="card">
+        <div class="card-title">Raw Signals</div>
+        <div class="metric-row">
+          <div class="metric">
+            <span class="metric-label">👁️ Gaze Drift</span>
+            <div class="metric-bar-outer"><div class="metric-bar-inner" id="bar-gaze" style="width:0%; background:var(--accent)"></div></div>
+            <span class="metric-value" id="val-gaze">0%</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">🔄 Head Turn</span>
+            <div class="metric-bar-outer"><div class="metric-bar-inner" id="bar-head" style="width:0%; background:var(--yellow)"></div></div>
+            <span class="metric-value" id="val-head">0°</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">✋ Fidget</span>
+            <div class="metric-bar-outer"><div class="metric-bar-inner" id="bar-fidget" style="width:0%; background:var(--purple)"></div></div>
+            <span class="metric-value" id="val-fidget">0%</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">👁️ Blink Rate</span>
+            <div class="metric-bar-outer"><div class="metric-bar-inner" id="bar-blink" style="width:50%; background:#06b6d4;"></div></div>
+            <span class="metric-value" id="val-blink">15</span>
+          </div>
+        </div>
+        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+          <span style="font-size:11px; color:var(--muted)">Quality:</span>
+          <span id="val-quality" style="font-size:11px; font-weight:600">—</span>
+          <span id="face-touch-badge" style="display:none; font-size:11px; background:#7c3aed30; color:#a78bfa; padding:2px 8px; border-radius:10px;">✋ Face Touch</span>
+        </div>
+      </div>
+
+      <!-- Session Stats -->
+      <div class="card">
+        <div class="card-title">Session Stats</div>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-val" id="stat-switches">0</div>
+            <div class="stat-lbl">Switches</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" id="stat-rate">0</div>
+            <div class="stat-lbl">Per Hour</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" id="stat-avg-proc">—</div>
+            <div class="stat-lbl">Avg Risk %</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" id="stat-trigger">—</div>
+            <div class="stat-lbl">Top Trigger</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Center Panel: Charts + Switch ── -->
+    <div class="center-panel">
+      <div style="display:grid; grid-template-rows: auto auto 1fr; gap:12px; height:100%">
+
+        <!-- Switch Status -->
+        <div class="card" style="display:flex; align-items:center; gap:16px; padding:12px 16px">
+          <div>
+            <div style="font-size:11px; color:var(--muted); margin-bottom:4px">CONTEXT SWITCH</div>
+            <div id="phase-label" class="phase-pill phase-focused">FOCUSED</div>
+          </div>
+          <div id="pred-box" style="display:none; flex:1; padding:8px 12px; background:var(--surface2); border-radius:8px; font-size:12px">
+            <span style="color:var(--yellow)">⚠️ Switch predicted in <strong id="pred-sec">0</strong>s</span>
+          </div>
+          <div id="ripple-box" style="display:none; flex:1; padding:8px 12px; background:#1e1030; border-radius:8px; font-size:12px; color:#c4b5fd">
+            <span id="ripple-label">—</span>
+          </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+          <div class="card">
+            <div class="card-title">Procrastination Risk (live)</div>
+            <div class="chart-wrap"><canvas id="chart-risk"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Cognitive State (live)</div>
+            <div class="chart-wrap"><canvas id="chart-cog"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Switch Timeline -->
+        <div class="card" style="overflow:hidden; display:flex; flex-direction:column">
+          <div class="card-title">Switch Timeline</div>
+          <div class="timeline" id="switch-timeline">
+            <div class="timeline-item"><span class="timeline-time">—</span><span>No switches yet this session</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Right Panel: Procrastination + Recovery + Insights ── -->
+    <div class="panel">
+
+      <!-- Procrastination Score -->
+      <div class="card">
+        <div class="card-title">Procrastination Risk</div>
+        <div class="risk-gauge-wrap">
+          <div class="risk-number low" id="risk-number">0<span style="font-size:24px">%</span></div>
+          <div class="risk-bar-outer">
+            <div class="risk-bar-inner" id="risk-bar" style="width:0%; background:var(--green)"></div>
+          </div>
+          <div style="font-size:12px; color:var(--muted); text-align:center" id="risk-label">Analyzing...</div>
+        </div>
+        <br>
+        <div class="card-title">Components</div>
+        <div class="metric-row" id="proc-components">
+          <!-- filled by JS -->
+        </div>
+      </div>
+
+      <!-- Recovery Plan -->
+      <div class="card" id="recovery-card" style="display:none">
+        <div class="card-title">🔁 Recovery Plan</div>
+        <div style="font-size:12px; color:var(--accent); margin-bottom:8px" id="recovery-plan-label">—</div>
+        <div class="action-list" id="recovery-actions"></div>
+      </div>
+
+      <!-- Meta-Cognition Insight -->
+      <div class="card" id="meta-card" style="display:none">
+        <div class="card-title">🧠 Self-Awareness Insight</div>
+        <div class="insight-item" id="meta-message">—</div>
+      </div>
+
+      <!-- Personal Cognitive Signature -->
+      <div class="card">
+        <div class="card-title">Personal Cognitive Signature</div>
+        <div class="metric-row">
+          <div class="metric">
+            <span class="metric-label">Avg Recovery</span>
+            <span id="sig-recovery" style="font-size:13px; font-weight:700; color:var(--accent)">—</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Avg Switch</span>
+            <span id="sig-switch" style="font-size:13px; font-weight:700; color:var(--yellow)">—</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Recovery</span>
+            <span id="sig-trend" style="font-size:13px; font-weight:700">—</span>
+          </div>
+        </div>
+        <div style="margin-top:10px; display:flex; flex-direction:column; gap:6px" id="sig-insights"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── WebSocket ──────────────────────────────────────────────────────────────
+let ws = null;
+let reconnectDelay = 1000;
+let riskChart, cogChart;
+const MAX_POINTS = 60;
+const riskData   = [];
+const focusData  = [];
+const loadData   = [];
+let alertTimer   = null;
+let frameTime    = Date.now();
+let frameCount   = 0;
+
+function connect() {
+  const host = window.location.host;
+  ws = new WebSocket(`ws://${host}/ws`);
+
+  ws.onopen = () => {
+    document.getElementById('conn-dot').className = 'status-dot connected';
+    reconnectDelay = 1000;
+  };
+
+  ws.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    if (d.type === 'calibrating')   handleCalibrating(d);
+    else if (d.type === 'data')     handleData(d);
+    else if (d.type === 'no_face')  handleNoFace(d);
+    else if (d.type === 'connected') handleConnected(d);
+  };
+
+  ws.onclose = () => {
+    document.getElementById('conn-dot').className = 'status-dot';
+    setTimeout(connect, reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 1.5, 10000);
+  };
+}
+
+// ── Calibration ────────────────────────────────────────────────────────────
+function handleConnected(d) {
+  document.getElementById('session-label').textContent = `Session #${d.session_id}`;
+  if (d.calibrated) {
+    document.getElementById('calibration-overlay').style.display = 'none';
+  }
+}
+
+function handleCalibrating(d) {
+  document.getElementById('calibration-overlay').style.display = 'flex';
+  document.getElementById('conn-dot').className = 'status-dot calibrating';
+  document.getElementById('cal-bar').style.width = d.progress + '%';
+  document.getElementById('cal-text').textContent = d.message;
+}
+
+function handleNoFace(d) {
+  document.getElementById('cog-label').textContent = d.message;
+}
+
+// ── Main Data Handler ──────────────────────────────────────────────────────
+function handleData(d) {
+  document.getElementById('calibration-overlay').style.display = 'none';
+  document.getElementById('conn-dot').className = 'status-dot connected';
+
+  // FPS counter
+  frameCount++;
+  const now = Date.now();
+  if (now - frameTime >= 1000) {
+    document.getElementById('frame-counter').textContent = frameCount + ' fps';
+    frameCount = 0;
+    frameTime  = now;
+  }
+
+  updateCognitive(d.cognitive);
+  updateSignals(d.signals);
+  updateSwitch(d.switch);
+  updateProcrastination(d.procrastination);
+  updateRecovery(d.recovery);
+  updateIntervention(d.intervention);
+  updateMeta(d.meta_insight);
+  updateSignature(d.signature);
+  updateRipple(d.ripple);
+  updateCharts(d);
+  updateStats(d);
+}
+
+function updateCognitive(c) {
+  const badge = document.getElementById('state-badge');
+  badge.className = 'state-badge ' + c.state;
+  badge.textContent = c.label;
+  document.getElementById('cog-label').textContent = '';
+
+  setBar('focus',    c.focus,      '#22c55e');
+  setBar('load',     c.load,       '#ef4444');
+  setBar('fatigue',  c.fatigue,    '#a855f7');
+  setBar('confusion',c.confusion,  '#f59e0b');
+}
+
+function setBar(id, val, color) {
+  const pct = Math.round(val * 100);
+  document.getElementById('bar-' + id).style.width = pct + '%';
+  document.getElementById('bar-' + id).style.background = color;
+  document.getElementById('val-' + id).textContent = pct + '%';
+}
+
+function updateSignals(s) {
+  const gazePct = Math.round(s.gaze_instability * 100);
+  document.getElementById('bar-gaze').style.width = gazePct + '%';
+  document.getElementById('val-gaze').textContent = gazePct + '%';
+
+  const headAbs = Math.abs(s.head_yaw_dev);
+  const headPct = Math.min(Math.round(headAbs / 3 * 100), 100);
+  document.getElementById('bar-head').style.width = headPct + '%';
+  document.getElementById('val-head').textContent = (s.head_yaw_dev * 5).toFixed(0) + '°';
+
+  const fidgetPct = Math.round(s.hand_speed * 100);
+  document.getElementById('bar-fidget').style.width = fidgetPct + '%';
+  document.getElementById('val-fidget').textContent = fidgetPct + '%';
+
+  const blinkPct  = Math.min(Math.round(s.blink_rate / 25 * 100), 100);
+  document.getElementById('bar-blink').style.width = blinkPct + '%';
+  document.getElementById('val-blink').textContent = s.blink_rate.toFixed(0);
+
+  document.getElementById('val-quality').textContent = Math.round(s.quality * 100) + '%';
+  document.getElementById('face-touch-badge').style.display = s.face_touch ? 'inline-flex' : 'none';
+}
+
+function updateSwitch(sw) {
+  const pill = document.getElementById('phase-label');
+  pill.className = 'phase-pill phase-' + sw.phase;
+  pill.textContent = sw.label;
+
+  const predBox = document.getElementById('pred-box');
+  if (sw.predicted) {
+    predBox.style.display = 'block';
+    document.getElementById('pred-sec').textContent = sw.pred_in_sec.toFixed(1);
+  } else {
+    predBox.style.display = 'none';
+  }
+
+  document.getElementById('stat-switches').textContent = sw.total_switches;
+  document.getElementById('stat-rate').textContent = sw.rate_per_hr.toFixed(1);
+
+  // Add to timeline on switch
+  if (sw.phase === 'switched') {
+    addTimeline('📴 Context switched', '#ef4444');
+  } else if (sw.phase === 'recovering') {
+    addTimeline('↩️ Returned — rebuilding focus', '#4f8ef7');
+  }
+}
+
+function updateProcrastination(p) {
+  const num   = document.getElementById('risk-number');
+  const bar   = document.getElementById('risk-bar');
+  const label = document.getElementById('risk-label');
+
+  num.className = 'risk-number ' + p.risk_level;
+  num.innerHTML = Math.round(p.score) + '<span style="font-size:24px">%</span>';
+  label.textContent = p.label;
+
+  const colors = { low:'#22c55e', medium:'#f59e0b', high:'#f97316', critical:'#ef4444' };
+  bar.style.width     = p.score + '%';
+  bar.style.background= colors[p.risk_level] || '#4f8ef7';
+
+  // Component bars
+  const comp = document.getElementById('proc-components');
+  comp.innerHTML = '';
+  const compLabels = {
+    hesitation:    '🤔 Hesitation',
+    gaze_drift:    '👁️ Gaze Drift',
+    fidgeting:     '✋ Fidgeting',
+    switch_intent: '🔄 Switch Intent',
+    cognitive_load:'🔴 Cog Load',
+  };
+  for (const [k, v] of Object.entries(p.components)) {
+    const pct   = Math.round(v * 100);
+    comp.innerHTML += `
+      <div class="metric">
+        <span class="metric-label" style="font-size:11px">${compLabels[k] || k}</span>
+        <div class="metric-bar-outer"><div class="metric-bar-inner" style="width:${pct}%; background:var(--accent)"></div></div>
+        <span class="metric-value">${pct}%</span>
+      </div>`;
+  }
+
+  document.getElementById('stat-avg-proc').textContent =
+    p.stats.avg_procrastination != null ? p.stats.avg_procrastination.toFixed(0) + '%' : '—';
+  document.getElementById('stat-trigger').textContent =
+    p.stats.top_trigger ? p.stats.top_trigger.substring(0,6) : '—';
+}
+
+function updateRecovery(r) {
+  const card = document.getElementById('recovery-card');
+  if (!r || !r.active) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  document.getElementById('recovery-plan-label').textContent = r.plan_label || '';
+  const list = document.getElementById('recovery-actions');
+  list.innerHTML = '';
+  (r.actions || []).forEach((a, i) => {
+    list.innerHTML += `
+      <div class="action-item">
+        <div class="action-num">${i+1}</div>
+        <div>${a.instruction} <span style="color:var(--muted); font-size:11px">(${a.duration}s)</span></div>
+      </div>`;
+  });
+}
+
+function updateIntervention(inv) {
+  if (!inv || !inv.active) return;
+  showAlert(inv.message, inv.type);
+}
+
+function updateMeta(m) {
+  const card = document.getElementById('meta-card');
+  if (!m || !m.active) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  document.getElementById('meta-message').textContent = m.message;
+}
+
+function updateSignature(sig) {
+  if (!sig) return;
+  document.getElementById('sig-recovery').textContent =
+    sig.avg_recovery_duration > 0 ? sig.avg_recovery_duration.toFixed(0) + 's' : '—';
+  document.getElementById('sig-switch').textContent =
+    sig.avg_switch_duration > 0   ? sig.avg_switch_duration.toFixed(0) + 's' : '—';
+  document.getElementById('sig-trend').textContent =
+    sig.recovery_improving ? '📈 Improving' : '—';
+
+  const insightEl = document.getElementById('sig-insights');
+  insightEl.innerHTML = '';
+  (sig.insights || []).forEach(ins => {
+    insightEl.innerHTML += `<div class="insight-item">${ins}</div>`;
+  });
+}
+
+function updateRipple(r) {
+  const box = document.getElementById('ripple-box');
+  if (!r || !r.active) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  document.getElementById('ripple-label').textContent = r.label || '';
+}
+
+function updateStats(d) {
+  if (d.procrastination && d.procrastination.stats) {
+    const s = d.procrastination.stats;
+    document.getElementById('stat-avg-proc').textContent =
+      s.avg_procrastination != null ? s.avg_procrastination.toFixed(0) + '%' : '—';
+  }
+}
+
+// ── Charts ─────────────────────────────────────────────────────────────────
+function initCharts() {
+  const chartOpts = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    plugins: { legend: { labels: { color: '#64748b', boxWidth: 10, font: { size: 10 } } } },
+    scales: {
+      x: { display: false },
+      y: { min: 0, max: 100, ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e2330' } }
+    }
+  };
+
+  riskChart = new Chart(document.getElementById('chart-risk'), {
+    type: 'line',
+    data: {
+      labels: Array(MAX_POINTS).fill(''),
+      datasets: [{ label: 'Risk %', data: Array(MAX_POINTS).fill(null),
+        borderColor: '#4f8ef7', backgroundColor: '#4f8ef720',
+        fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 }]
+    },
+    options: chartOpts,
+  });
+
+  cogChart = new Chart(document.getElementById('chart-cog'), {
+    type: 'line',
+    data: {
+      labels: Array(MAX_POINTS).fill(''),
+      datasets: [
+        { label: 'Focus', data: Array(MAX_POINTS).fill(null),
+          borderColor: '#22c55e', fill: false, tension: 0.4, pointRadius: 0, borderWidth: 2 },
+        { label: 'Load',  data: Array(MAX_POINTS).fill(null),
+          borderColor: '#ef4444', fill: false, tension: 0.4, pointRadius: 0, borderWidth: 2 },
+        { label: 'Fatigue', data: Array(MAX_POINTS).fill(null),
+          borderColor: '#a855f7', fill: false, tension: 0.4, pointRadius: 0, borderWidth: 2 },
+      ]
+    },
+    options: chartOpts,
+  });
+}
+
+function updateCharts(d) {
+  // Risk chart
+  const risk = riskChart.data.datasets[0].data;
+  risk.push(d.procrastination.score);
+  if (risk.length > MAX_POINTS) risk.shift();
+  riskChart.update();
+
+  // Cog chart
+  const f = cogChart.data.datasets[0].data;
+  const l = cogChart.data.datasets[1].data;
+  const fa= cogChart.data.datasets[2].data;
+  f.push(d.cognitive.focus   * 100);
+  l.push(d.cognitive.load    * 100);
+  fa.push(d.cognitive.fatigue* 100);
+  if (f.length > MAX_POINTS)  { f.shift(); l.shift(); fa.shift(); }
+  cogChart.update();
+}
+
+// ── Timeline ────────────────────────────────────────────────────────────────
+let lastPhase = '';
+function addTimeline(msg, color) {
+  const tl   = document.getElementById('switch-timeline');
+  const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  const item = document.createElement('div');
+  item.className = 'timeline-item';
+  item.innerHTML = `<span class="timeline-time">${time}</span><span style="color:${color}">${msg}</span>`;
+  tl.insertBefore(item, tl.firstChild);
+  // Keep max 20 items
+  while (tl.children.length > 20) tl.removeChild(tl.lastChild);
+}
+
+// ── Alert Banner ─────────────────────────────────────────────────────────────
+let lastAlertMsg = '';
+function showAlert(message, type) {
+  if (message === lastAlertMsg) return;
+  lastAlertMsg = message;
+  const banner = document.getElementById('alert-banner');
+  const icons  = { warning: '⚠️', delay: '⏸️', coaching: '💡' };
+  document.getElementById('alert-icon').textContent = icons[type] || '💡';
+  document.getElementById('alert-msg').textContent  = message;
+  banner.className = 'alert-banner visible ' + (type || '');
+  clearTimeout(alertTimer);
+  alertTimer = setTimeout(dismissAlert, 8000);
+}
+
+function dismissAlert() {
+  document.getElementById('alert-banner').className = 'alert-banner';
+  lastAlertMsg = '';
+}
+
+// ── Recalibrate ───────────────────────────────────────────────────────────
+async function recalibrate() {
+  await fetch('/api/recalibrate', { method: 'POST' });
+  document.getElementById('calibration-overlay').style.display = 'flex';
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+initCharts();
+connect();
+</script>
+</body>
+</html>

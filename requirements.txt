@@ -1,0 +1,28 @@
+# ══════════════════════════════════════════════════════════════
+# FocusForge v2 — requirements.txt
+# Install: pip install -r requirements.txt
+# ══════════════════════════════════════════════════════════════
+
+# ── Web server ────────────────────────────────────────────────
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+websockets==12.0
+python-multipart==0.0.9
+
+# ── Computer Vision ───────────────────────────────────────────
+mediapipe==0.10.14
+opencv-python==4.10.0.84
+
+# ── Numerics (LSTM runs on NumPy — no PyTorch needed) ─────────
+numpy==1.26.4
+scipy==1.13.1
+scikit-learn==1.5.0
+
+# ── Database ──────────────────────────────────────────────────
+aiosqlite==0.20.0
+
+# ── Config ────────────────────────────────────────────────────
+pyyaml==6.0.1
+
+# ── Signal processing ─────────────────────────────────────────
+filterpy==1.4.5
